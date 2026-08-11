@@ -8,7 +8,10 @@ import json
 from pathlib import Path
 
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+try:
+    from transformers_471 import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+except:
+    from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
 from AILab_QwenVL import (
     ATTENTION_MODES,

@@ -26,10 +26,13 @@ import torch
 from PIL import Image
 from huggingface_hub import snapshot_download
 try:
-    from transformers import AutoModelForImageTextToText as AutoModelForVision2Seq
+    from transformers_471 import AutoModelForImageTextToText as AutoModelForVision2Seq
 except ImportError:
     from transformers import AutoModelForVision2Seq
-from transformers import AutoProcessor, AutoTokenizer, BitsAndBytesConfig
+try:
+    from transformers_471 import AutoProcessor, AutoTokenizer, BitsAndBytesConfig
+except:
+    from transformers import AutoProcessor, AutoTokenizer, BitsAndBytesConfig
 
 import folder_paths
 from comfy.utils import ProgressBar
@@ -333,22 +336,34 @@ def set_sage_attention(model):
     
     # Qwen2 models
     try:
-        from transformers.models.qwen2.modeling_qwen2 import Qwen2Attention, apply_rotary_pos_emb as qwen2_apply_rotary
-        attention_classes.append((Qwen2Attention, qwen2_apply_rotary))
+        try:
+            from transformers_471.models.qwen2.modeling_qwen2 import Qwen2Attention, apply_rotary_pos_emb as qwen2_apply_rotary
+            attention_classes.append((Qwen2Attention, qwen2_apply_rotary))
+        except:
+            from transformers.models.qwen2.modeling_qwen2 import Qwen2Attention, apply_rotary_pos_emb as qwen2_apply_rotary
+            attention_classes.append((Qwen2Attention, qwen2_apply_rotary))
     except ImportError:
         pass
     
     # Qwen3 models (Qwen3-VL, etc.)
     try:
-        from transformers.models.qwen3.modeling_qwen3 import Qwen3Attention, apply_rotary_pos_emb as qwen3_apply_rotary
-        attention_classes.append((Qwen3Attention, qwen3_apply_rotary))
+        try:
+            from transformers_471.models.qwen3.modeling_qwen3 import Qwen3Attention, apply_rotary_pos_emb as qwen3_apply_rotary
+            attention_classes.append((Qwen3Attention, qwen3_apply_rotary))
+        except:
+            from transformers.models.qwen3.modeling_qwen3 import Qwen3Attention, apply_rotary_pos_emb as qwen3_apply_rotary
+            attention_classes.append((Qwen3Attention, qwen3_apply_rotary))
     except ImportError:
         pass
     
     # Qwen3-VL specific
     try:
-        from transformers.models.qwen3_vl.modeling_qwen3_vl import Qwen3VLTextAttention, apply_rotary_pos_emb as qwen3vl_apply_rotary
-        attention_classes.append((Qwen3VLTextAttention, qwen3vl_apply_rotary))
+        try:
+            from transformers_471.models.qwen3_vl.modeling_qwen3_vl import Qwen3VLTextAttention, apply_rotary_pos_emb as qwen3vl_apply_rotary
+            attention_classes.append((Qwen3VLTextAttention, qwen3vl_apply_rotary))
+        except:
+            from transformers.models.qwen3_vl.modeling_qwen3_vl import Qwen3VLTextAttention, apply_rotary_pos_emb as qwen3vl_apply_rotary
+            attention_classes.append((Qwen3VLTextAttention, qwen3vl_apply_rotary))
     except ImportError:
         pass
     
@@ -472,6 +487,10 @@ def ensure_model(model_name):
     if target.exists() and target.is_dir():
         if any(target.glob("*.safetensors")) or any(target.glob("*.bin")):
             return str(target)
+    cache_dir = Path(folder_paths.cache_dir) / "models" / "Qwen" / repo_id.split("/")[-1]
+    if cache_dir.exists() and cache_dir.is_dir():
+        if any(cache_dir.glob("*.safetensors")) or any(cache_dir.glob("*.bin")):
+            return str(cache_dir)
 
     snapshot_download(
         repo_id=repo_id,
@@ -663,7 +682,10 @@ class QwenVLBase:
                 print(f"[QwenVL] Loading weights from {model_path}")
                 try:
                     # Use HuggingFace's official sharded checkpoint loading
-                    from transformers.modeling_utils import load_sharded_checkpoint
+                    try:
+                        from transformers_471.modeling_utils import load_sharded_checkpoint
+                    except:
+                        from transformers.modeling_utils import load_sharded_checkpoint
                     
                     print(f"[QwenVL] Loading weights from {model_path}")
                     
@@ -676,8 +698,12 @@ class QwenVLBase:
                         print("[QwenVL] All shards loaded successfully")
                     else:
                         # Single-file checkpoint - use HF's standard loading
-                        from transformers.modeling_utils import load_state_dict
-                        from transformers.utils import SAFE_WEIGHTS_NAME, WEIGHTS_NAME
+                        try:
+                            from transformers_471.modeling_utils import load_state_dict
+                            from transformers_471.utils import SAFE_WEIGHTS_NAME, WEIGHTS_NAME
+                        except:
+                            from transformers.modeling_utils import load_state_dict
+                            from transformers.utils import SAFE_WEIGHTS_NAME, WEIGHTS_NAME
                         
                         if os.path.exists(os.path.join(model_path, SAFE_WEIGHTS_NAME)):
                             state_dict_path = os.path.join(model_path, SAFE_WEIGHTS_NAME)
@@ -807,6 +833,8 @@ class QwenVLBase:
             kwargs.update({"do_sample": True, "temperature": temperature, "top_p": top_p})
         else:
             kwargs["do_sample"] = False
+        kwargs.pop('mm_token_type_ids', None)
+        model_inputs.pop('mm_token_type_ids', None)
         outputs = self.model.generate(**model_inputs, **kwargs)
         if torch.cuda.is_available():
             torch.cuda.synchronize()
